@@ -1,0 +1,19 @@
+externalAccess:
+  enabled: true
+
+auth:
+  rootPassword: password
+  username: username
+  password: password
+  database: app
+
+image:
+  repository: bitnami/mongodb
+  tag: 4.4.8
+
+service:
+  type: LoadBalancer
+  port: 27017
+
+persistence:
+  enabled: false

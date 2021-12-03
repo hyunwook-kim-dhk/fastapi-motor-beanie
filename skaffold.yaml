@@ -1,0 +1,24 @@
+apiVersion: skaffold/v2beta21
+kind: Config
+metadata:
+  name: fastapi-motor-skeleton
+build:
+  artifacts:
+    - image: fastapi-motor-skeleton
+      docker:
+        dockerfile: Dockerfile
+portForward:
+  - resourceType: service
+    resourceName: mongodb
+    port: 27017
+deploy:
+  helm:
+    releases:
+      - name: mongodb
+        remoteChart: bitnami/mongodb
+        wait: true
+        valuesFiles:
+          - k8s/mongodb/values.yaml
+  kubectl:
+    manifests:
+      - k8s/default.yaml

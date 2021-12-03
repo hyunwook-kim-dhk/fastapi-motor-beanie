@@ -1,0 +1,22 @@
+# Properties
+*.prop
+
+# Benchmarks
+.benchmarks
+
+# IDE
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+htmlcov/
+.coverage
+.coverage.*
+.benchmarks/
+.env/
+.venv/
+.mypy_cache/
+.pytest_cache/

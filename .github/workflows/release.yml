@@ -1,0 +1,72 @@
+name: Manual Release Process Workflow
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: 'Incremental Level'
+        required: true
+        default: 'prerel'
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the codes
+        uses: actions/checkout@v2
+      - name: Check if the branch is stage or hotfix
+        run: |
+          if [ "${GITHUB_REF##*/}" != "stage" ] && [ "${GITHUB_REF##*/}" != "hotfix" ] && [ "${GITHUB_REF##*/}" != "main" ] ; then
+            exit 1
+          fi
+      - name: Install semver
+        run: |
+          mkdir -p "${HOME}/.bin"
+          (cd "${HOME}/.bin" && curl -O https://raw.githubusercontent.com/fsaintjacques/semver-tool/master/src/semver)
+          chmod +x "${HOME}/.bin/semver"
+          echo "::add-path::${HOME}/.bin"
+      - name: Get the current version
+        id: get-current-version
+        run: |
+          CURRENT_VERSION=$(awk -F'[ ="]+' '$1 == "version" { print $2 }' pyproject.toml)
+          echo "::set-output name=CURRENT_VERSION::${CURRENT_VERSION}"
+      - name: Get the bumped version
+        id: get-bumped-version
+        run: |
+          if [ "${{ github.event.inputs.level }}" == "prerel" ] ; then
+            PREREL_OPTION="${GITHUB_REF##*/}.."
+          else
+            PREREL_OPTION=""
+          fi
+          BUMPED_VERSION=$(semver ${{ github.event.inputs.level }} ${PREREL_OPTION} ${{ steps.get-current-version.outputs.CURRENT_VERSION}})
+          echo "::set-output name=BUMPED_VERSION::${BUMPED_VERSION}"
+      - name: Update the version related files
+        run: |
+          CURRENT_VERSION="${{ steps.get-current-version.outputs.CURRENT_VERSION}}"
+          BUMPED_VERSION="${{ steps.get-bumped-version.outputs.BUMPED_VERSION}}"
+          sed -i "s/version = \"${CURRENT_VERSION}\"/version = \"${BUMPED_VERSION}\"/" pyproject.toml
+      - name: Set up Docker build environment
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker build environment
+        uses: docker/setup-buildx-action@v1
+      - name: Build docker image for production version
+        if: ${{ github.ref == 'refs/heads/main' }}
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          no-cache: true
+          push: false # This will be changed to true
+          tags: ${GITHUB_REPOSITORY}:${{ steps.get-bumped-version.outputs.BUMPED_VERSION }}
+      - name: Build docker image for staging version
+        if: ${{ github.ref == 'refs/heads/stage' || github.ref == 'refs/heads/hotfix' }}
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          no-cache: true
+          push: false # This will be changed to true
+          tags: ${GITHUB_REPOSITORY}:${{ steps.get-bumped-version.outputs.BUMPED_VERSION }}
+      - name: Commit, Tag and Push
+        uses: EndBug/add-and-commit@v7
+        with:
+          message: Bump the version from ${{ steps.get-current-version.outputs.CURRENT_VERSION}} to ${{ steps.get-bumped-version.outputs.BUMPED_VERSION}} by ${{ github.event.inputs.level }}
+          push: false # This will be changed to true
+          add: "pyproject.toml"
+          tag: ${{ steps.get-bumped-version.outputs.BUMPED_VERSION}}
